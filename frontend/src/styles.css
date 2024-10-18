@@ -1,0 +1,54 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-size: 16px;
+}
+
+.App {
+  font-family: sans-serif;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.editor {
+  display: flex;
+  flex: 1;
+  justify-content: center;
+  align-items: center;
+}
+
+.buttons-wrapper {
+  display: flex;
+  gap: 1rem;
+}
+
+.preview-wrapper {
+  display: flex;
+  flex: 1;
+  height: 50%;
+  padding: 1rem;
+  overflow: scroll;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* .sheet-music {
+  width: 220% !important;
+  height: 220% !important;
+} */
+
+.sheet-music {
+  height: 300px; 
+  overflow-x: auto !important; 
+  overflow-y: hidden !important; 
+  white-space: nowrap; 
+}
+.sheet-music svg {
+  height: 100%; 
+  width: auto;  
+}
