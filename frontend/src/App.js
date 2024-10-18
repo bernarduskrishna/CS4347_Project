@@ -41,25 +41,50 @@ const extractMelody = (value) => {
   return lines[melodyIndex + 1];
 }
 
-const suggestHarmony = (melody, harmony) => {
-  fetch("/suggest_harmony", {
-    method: "POST",
-    body: JSON.stringify({ melody, harmony }),
-  }).then((res) => res.json()).then((data) => {
-    console.log(data);
-  })
-  // TODO: Implement harmony suggestion
-  return harmony;
-}
-
-const suggestMelody = (melody, harmony) => {
-  // TODO: Implement melody suggestion
-  return melody;
-}
-
 export default function App() {
   const [value, setValue] = useState(defaultValue);
   const [isPlaying, setPlaying] = useState(false);
+
+  const updateHarmony = (new_harmony) => {
+    const lines = value.split("\n");
+    const harmonyIndex = lines.findIndex((line) => line.startsWith("V:2"));
+    lines[harmonyIndex + 1] += new_harmony;
+    setValue(lines.join("\n"));
+  }
+
+  const updateMelody = (new_melody) => {
+    const lines = value.split("\n");
+    const melodyIndex = lines.findIndex((line) => line.startsWith("V:1"));
+    lines[melodyIndex + 1] += new_melody;
+    setValue(lines.join("\n"));
+  }
+
+  const suggestHarmony = (melody, harmony) => {
+    fetch("/suggest_harmony", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ "melody": melody, "harmony": harmony }),
+    }).then((res) => res.json()).then((data) => {
+      console.log(data);
+      updateHarmony(data["harmony"]);
+    })
+  }
+
+  const suggestMelody = (melody, harmony) => {
+    fetch("/suggest_melody", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ "melody": melody, "harmony": harmony }),
+    }).then((res) => res.json()).then((data) => {
+      console.log(data);
+      updateMelody(data["melody"]);
+    })
+  }
+
   function onEditorChange(value, event) {
     setValue(value);
   }

@@ -1,4 +1,5 @@
-from flask import Flask
+from flask import Flask, request
+import model
 
 app = Flask(__name__)
 
@@ -8,19 +9,31 @@ def hello_world():
 
 @app.route("/suggest_melody", methods=["POST"])
 def suggest_melody():
-    # TODO: Implement this
-    json_ret = {
-        "melody": "melody suggestion"
+    json_data = request.get_json()
+    melody = json_data["melody"]
+    harmony = json_data["harmony"]
+
+    # melody_suggestion = model.suggest_melody(melody, harmony)
+    # For now, just return a hardcoded melody suggestion
+    melody_suggestion = "D3 EFFED"
+
+    return {
+        "melody": melody_suggestion
     }
-    return json_ret
 
 @app.route("/suggest_harmony", methods=["POST"])
 def suggest_harmony():
-    # TODO: Implement this
-    json_ret = {
-        "harmony": "harmony suggestion"
+    json_data = request.get_json()
+    melody = json_data["melody"]
+    harmony = json_data["harmony"]
+
+    # harmony_suggestion = model.suggest_harmony(melody, harmony)
+    # For now, just return a hardcoded harmony suggestion
+    harmony_suggestion = "[G,B,D]8"
+
+    return {
+        "harmony": harmony_suggestion
     }
-    return json_ret
 
 if __name__ == "__main__":
     app.run()
