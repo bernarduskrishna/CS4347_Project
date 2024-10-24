@@ -3,7 +3,8 @@ import { useState, useEffect } from "react";
 import * as Tone from "tone";
 
 import Editor from "./Editor";
-import Preview from "./Preview";
+import Preview from "./components/Preview";
+import Navbar from "./components/Navbar";
 import { Dialog, DialogTitle, DialogContent, Typography } from "@mui/material";
 
 import "./styles.css";
@@ -51,7 +52,7 @@ const CandidateModal = ({ candidates, open, onClose, onSelectCandidate }) => {
               <Typography variant="h6" component="div">
                 Candidate {index + 1}
               </Typography>
-              <Preview value={candidate} />
+              <Preview value={candidate} onEvent={() => {}} isPlaying={false}/>
             </div>
           ))}
         </div>
@@ -106,8 +107,6 @@ export default function App() {
       body: JSON.stringify({ "abc": value }),
     }).then((res) => res.json()).then((data) => {
       const formattedAbcs = data["abc"].map((abc) => formatAbc(abc));
-      // const formattedAbc = formatAbc(data["abc"]);
-      console.log(formattedAbcs);
       setCandidates(formattedAbcs);
       handleOpen();
     })
@@ -116,9 +115,6 @@ export default function App() {
   function onEditorChange(value, event) {
     setValue(value);
   }
-  useEffect(() => {
-    setPlaying(false);
-  }, [value]);
 
   function onEvent(event) {
     if (!event) {
@@ -130,7 +126,7 @@ export default function App() {
   }
 
   function play() {
-    setPlaying(!isPlaying);
+    setPlaying(true);
   }
 
   const handleSelectCandidate = (candidate) => {
@@ -143,21 +139,9 @@ export default function App() {
 
   return (
     <div className="App">
+      <Navbar play={play} suggestContinuation={suggestContinuation} setValue={setValue} formatAbc={formatAbc}/>
       <div className="preview-wrapper">
-        <header className="buttons-wrapper">
-          <button onClick={play}>Play</button>
-          <button onClick={suggestContinuation}> Suggest Continuation </button>
-        </header>
         <Preview value={value} onEvent={onEvent} isPlaying={isPlaying} />
-        <div className="candidates">
-          {candidates.map((candidate, index) => {
-            return (
-              <div key={index} className="candidate">
-                <Preview value={candidate}/>
-              </div>
-            );
-          })}
-        </div>
       </div>
       <Editor onEditorChange={onEditorChange} defaultValue={defaultValue} value={value} />
       <CandidateModal

@@ -1,5 +1,5 @@
 import ReactMarkdown from "react-markdown";
-import Score from "./Score";
+import Score from "../Score";
 import uniqid from "uniqid";
 
 export default function Preview({ value, onEvent, isPlaying }) {
