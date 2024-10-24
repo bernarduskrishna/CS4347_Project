@@ -110,7 +110,6 @@ export default function App() {
       console.log(formattedAbcs);
       setCandidates(formattedAbcs);
       handleOpen();
-      setValue(formattedAbcs[0]);
     })
   }
 
