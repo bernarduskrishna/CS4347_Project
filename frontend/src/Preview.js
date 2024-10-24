@@ -12,7 +12,7 @@ export default function Preview({ value, onEvent, isPlaying }) {
           notation={`${children}`.replace(/\n$/, "")}
           onEvent={onEvent}
           isPlaying={isPlaying}
-          style={{ width: "120%" }}
+          style={{ width: "100%" }}
         />
       ) : (
         <code className={className} {...props} />

@@ -4,6 +4,7 @@ import * as Tone from "tone";
 
 import Editor from "./Editor";
 import Preview from "./Preview";
+import { Dialog, DialogTitle, DialogContent, Typography } from "@mui/material";
 
 import "./styles.css";
 
@@ -13,9 +14,7 @@ X: 1
 M: 4/4
 K: C
 V:1                             clef=treble staff=1
-C3 D E3 C | E2 C2E4     |
-V:2                             clef=bass staff=1
-[C,E,G,]8 |[C,E,G,]8    |
+C3 D E3 C | E2 C2 E4    |
 \`\`\``;
 
 const piano = new Tone.Sampler({
@@ -29,59 +28,89 @@ const piano = new Tone.Sampler({
 	baseUrl: "https://tonejs.github.io/audio/salamander/",
 }).toDestination();
 
-const extractHarmony = (value) => {
-  const lines = value.split("\n");
-  const harmonyIndex = lines.findIndex((line) => line.startsWith("V:2"));
-  return lines[harmonyIndex + 1];
-}
+// Assuming Preview is already a defined component that renders a candidate
+const CandidateModal = ({ candidates, open, onClose, onSelectCandidate }) => {
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="lg" // This makes the modal quite large
+      PaperProps={{ style: { minHeight: "80vh" } }} // Customize to make the height large enough
+    >
+      <DialogTitle>Select a Candidate</DialogTitle>
+      <DialogContent>
+        <div className="candidates">
+          {candidates.map((candidate, index) => (
+            <div
+              key={index}
+              className="candidate"
+              style={{ marginBottom: "16px", cursor: "pointer" }} // Spacing between candidates and pointer for selectability
+              onClick={() => onSelectCandidate(candidate)} // Call the function when a candidate is clicked
+            >
+              <Typography variant="h6" component="div">
+                Candidate {index + 1}
+              </Typography>
+              <Preview value={candidate} />
+            </div>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
-const extractMelody = (value) => {
-  const lines = value.split("\n");
-  const melodyIndex = lines.findIndex((line) => line.startsWith("V:1"));
-  return lines[melodyIndex + 1];
+const formatAbc = (abc) => {
+  // Firstly, remove all lines that start with T: or C: or w:
+  abc = abc.split("\n").filter((line) => {
+    return !line.startsWith("T:") && !line.startsWith("C:") && !line.startsWith("w:");
+  }).join("\n");
+  // If last line is empty line, remove it
+  if (abc[abc.length - 1] === "\n") {
+    abc = abc.slice(0, -1);
+  }
+  // If there are multiple V: lines, remove all but the first one
+  let vCount = 0;
+
+  abc = abc.split("\n").filter((line) => {
+    if (line.startsWith("V:")) {
+      if (vCount === 0) {
+        vCount++;
+        return true;
+      }
+      return false;
+    }
+    return true;
+  }
+  ).join("\n");
+
+  return `\n\`\`\`abc\n${abc}\n\`\`\``;
 }
 
 export default function App() {
   const [value, setValue] = useState(defaultValue);
   const [isPlaying, setPlaying] = useState(false);
+  const [candidates, setCandidates] = useState([]);
 
-  const updateHarmony = (new_harmony) => {
-    const lines = value.split("\n");
-    const harmonyIndex = lines.findIndex((line) => line.startsWith("V:2"));
-    lines[harmonyIndex + 1] += new_harmony;
-    setValue(lines.join("\n"));
-  }
+  const [open, setOpen] = useState(false);
 
-  const updateMelody = (new_melody) => {
-    const lines = value.split("\n");
-    const melodyIndex = lines.findIndex((line) => line.startsWith("V:1"));
-    lines[melodyIndex + 1] += new_melody;
-    setValue(lines.join("\n"));
-  }
+  const handleOpen = () => setOpen(true);
+  const handleClose = () => setOpen(false);
 
-  const suggestHarmony = (melody, harmony) => {
-    fetch("/suggest_harmony", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ "melody": melody, "harmony": harmony }),
-    }).then((res) => res.json()).then((data) => {
-      console.log(data);
-      updateHarmony(data["harmony"]);
-    })
-  }
-
-  const suggestMelody = (melody, harmony) => {
+  const suggestContinuation = () => {
     fetch("/suggest_melody", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ "melody": melody, "harmony": harmony }),
+      body: JSON.stringify({ "abc": value }),
     }).then((res) => res.json()).then((data) => {
-      console.log(data);
-      updateMelody(data["melody"]);
+      const formattedAbcs = data["abc"].map((abc) => formatAbc(abc));
+      // const formattedAbc = formatAbc(data["abc"]);
+      console.log(formattedAbcs);
+      setCandidates(formattedAbcs);
+      handleOpen();
+      setValue(formattedAbcs[0]);
     })
   }
 
@@ -91,9 +120,6 @@ export default function App() {
   useEffect(() => {
     setPlaying(false);
   }, [value]);
-
-  const harmony = extractHarmony(value);
-  const melody = extractMelody(value);
 
   function onEvent(event) {
     if (!event) {
@@ -108,17 +134,39 @@ export default function App() {
     setPlaying(!isPlaying);
   }
 
+  const handleSelectCandidate = (candidate) => {
+    console.log("Selected Candidate:", candidate);
+    setValue(candidate);
+    // Perform any action with the selected candidate here
+    setOpen(false);
+    setCandidates([]);
+  };
+
   return (
     <div className="App">
       <div className="preview-wrapper">
         <header className="buttons-wrapper">
           <button onClick={play}>Play</button>
-          <button onClick={() => suggestMelody(melody, harmony)}> Suggest Melody </button>
-          <button onClick={() => suggestHarmony(melody, harmony)}> Suggest Harmony </button>
+          <button onClick={suggestContinuation}> Suggest Continuation </button>
         </header>
         <Preview value={value} onEvent={onEvent} isPlaying={isPlaying} />
+        <div className="candidates">
+          {candidates.map((candidate, index) => {
+            return (
+              <div key={index} className="candidate">
+                <Preview value={candidate}/>
+              </div>
+            );
+          })}
+        </div>
       </div>
-      <Editor onEditorChange={onEditorChange} defaultValue={defaultValue} />
+      <Editor onEditorChange={onEditorChange} defaultValue={defaultValue} value={value} />
+      <CandidateModal
+        candidates={candidates}
+        open={open}
+        onClose={handleClose}
+        onSelectCandidate={handleSelectCandidate}
+      />
     </div>
   );
 }
