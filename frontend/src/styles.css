@@ -36,15 +36,10 @@ body {
   flex: 1;
   height: 50%;
   padding: 1rem;
-  overflow: scroll;
+  overflow-y: scroll;
   flex-direction: column;
   justify-content: space-between;
 }
-
-/* .sheet-music {
-  width: 220% !important;
-  height: 220% !important;
-} */
 
 .sheet-music {
   height: 300px; 

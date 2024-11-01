@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
-import model2
+import model
 
 app = Flask(__name__)
 CORS(app, origins=["http://localhost:3000"])
@@ -48,11 +48,21 @@ def suggest_melody():
     abc = abc[1:-1]
     abc = "\n".join(abc)
 
-    melody_suggestion = model2.suggest_melody(abc)
-    melody_suggestions = model2.suggest_melodies(abc)
+    melody_suggestions = model.suggest_melodies(abc)
 
     return {
         "abc": melody_suggestions
+    }
+
+@app.route("/suggest_harmony", methods=["POST"])
+def suggest_harmony():
+    json_data = request.get_json()
+    chords = json_data["chords"]
+
+    harmony_suggestions = model.suggest_harmonies(chords)
+
+    return {
+        "chords": harmony_suggestions
     }
 
 if __name__ == "__main__":

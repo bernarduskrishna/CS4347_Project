@@ -1,53 +1,101 @@
-from transformers import AutoTokenizer, AutoModelForCausalLM, GenerationConfig
+from musiclang_predict import MusicLangPredictor
+from music21 import converter
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import os
+import random
+import subprocess
 import torch
-import re
-from string import Template
-prompt_template = Template("Human: ${inst} </s> Assistant: ")
 
-tokenizer = AutoTokenizer.from_pretrained("m-a-p/ChatMusician-Base", trust_remote_code=True)
-model = AutoModelForCausalLM.from_pretrained("m-a-p/ChatMusician-Base", device_map='cuda', torch_dtype=torch.float16).eval()
+nb_tokens = 1024
+nb_chords = 1 
+temperature = 0.9
+top_p = 1.0
+seed = 16
 
-generation_config = GenerationConfig(
-    temperature=0.2,
-    top_k=40,
-    top_p=0.9,
-    do_sample=True,
-    num_beams=1,
-    repetition_penalty=1.1,
-    min_new_tokens=10,
-    max_new_tokens=1536
-)
+ml = MusicLangPredictor('musiclang/musiclang-v2')
 
-def prompt_llm(instruction):
-    prompt = prompt_template.safe_substitute({"inst": instruction})
-    inputs = tokenizer(prompt, return_tensors="pt", add_special_tokens=False)
-    response = model.generate(
-            input_ids=inputs["input_ids"].to(model.device),
-            attention_mask=inputs['attention_mask'].to(model.device),
-            eos_token_id=tokenizer.eos_token_id,
-            generation_config=generation_config,
-            )
+tokenizer = AutoTokenizer.from_pretrained("musiclang/text-chord-predictor")
+ml_chord = AutoModelForCausalLM.from_pretrained("musiclang/text-chord-predictor")
+
+def suggest_melody(abc):
+    # save abc to temp.abc
+    with open('temp.abc', 'w') as f:
+        f.write(abc)
+
+    # remove temp.mid
+    os.system('rm temp.mid')
+
+    # convert abc notation to midi and save it as temp.mid
+    s = converter.parse('temp.abc')
+    s.write('midi', fp='temp.mid')
+
+    # generate melody
+    score = ml.predict(
+        nb_tokens=nb_tokens,
+        score='temp.mid',
+        temperature=temperature,
+        topp=top_p,
+        rng_seed=seed,
+        nb_chords=1
+    )
+
+    # Delete temp.musicxml and ./META-INF and ./temp
+    os.system('rm temp.mxl')
+    os.system('rm -r META-INF')
+    os.system('rm -r temp')
+
+    score.to_musicxml('temp.mxl')
     
-    return tokenizer.decode(response[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
+    # unzip temp.mxl
+    os.system('unzip temp.mxl')
 
-def suggest_harmony(melody, harmony):
-    instruction = f"""
-    Given the following melody: {melody}
-    And the following harmony: {harmony}
-    Suggest only the harmony for the next unwritten bar in abc notation.
-    Respond with just the abc notation for the new bar, and nothing else.
-    Do not repeat the previous bars or provide any additional context.
-    """
+    args = ['python', 'xml2abc.py', 'temp.musicxml', '-o', 'temp']
+    os.system(' '.join(args))
 
-    return prompt_llm(instruction)
+    # look at stdout
+    result = subprocess.run(args, stdout=subprocess.PIPE, stderr = subprocess.PIPE).stderr.decode('utf-8')
 
-def suggest_melody(melody, harmony):
-    instruction = f"""
-    Given the following melody in abc notation: {melody}
-    And the following harmony in abc notation: {harmony}
-    Suggest only the melody for the next unwritten bar in abc notation.
-    Respond with just the abc notation for the new bar, and nothing else.
-    Do not repeat the previous bars or provide any additional context.
-    """
+    # if it's not temp.abc written with 1 voices, return ""
+    if 'temp.abc written with 1 voices' not in result:
+        return ""
 
-    return prompt_llm(instruction)
+    # Read the generated abc
+    with open('./temp/temp.abc', 'r') as f:
+        melody = f.read()
+
+    return melody
+
+# call suggest_melody, but change seed every time
+def suggest_melodies(abc):
+    global seed
+    melodies_set = set()
+    while len(melodies_set) < 5:
+        # random seed
+        seed = random.randint(0, 1000)
+        melody = suggest_melody(abc)
+        if melody not in melodies_set and melody != "":
+            melodies_set.add(melody)
+    return list(melodies_set)
+
+def suggest_harmonies(chords = "CM CM"):
+    inputs = tokenizer(chords, return_tensors='pt')
+    input_ids = inputs.input_ids
+    attention_mask = inputs.attention_mask
+    # torch.manual_seed(3000)
+    x = ml_chord.generate(input_ids, attention_mask=attention_mask, max_length = len(input_ids[0]) + 1, num_return_sequences=100, do_sample=True)
+    tally = {}
+    for a in x:
+        d = tokenizer.decode(a, skip_special_tokens=True)
+        if d not in tally:
+            tally[d] = 1
+        else:
+            tally[d] += 1
+
+    # Get top 5 most common suggestions
+    tally = sorted(tally.items(), key=lambda x: x[1], reverse=True)
+    if tally[0] == "":
+        tally = [x[0] for x in tally[1:6]]
+    else:
+        tally = [x[0] for x in tally[:5]]
+    
+    return tally

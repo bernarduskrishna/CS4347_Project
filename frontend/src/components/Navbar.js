@@ -46,8 +46,12 @@ const Navbar = (props) => {
     props.play()
   };
 
-  const handleSuggestContinuation= () => {
-    props.suggestContinuation()
+  const handleSuggestMelody = () => {
+    props.suggestMelody()
+  };
+
+  const handleSuggestHarmony = () => {
+    props.suggestHarmony()
   };
 
   const VisuallyHiddenInput = styled('input')({
@@ -114,9 +118,16 @@ const Navbar = (props) => {
         <Button
           variant="contained"
           color="success"
-          onClick={handleSuggestContinuation}
+          onClick={handleSuggestMelody}
         >
-          Suggest Continuation
+          Suggest Melody
+        </Button>
+        <Button
+          variant="contained"
+          color="success"
+          onClick={handleSuggestHarmony}
+        >
+          Suggest Harmony
         </Button>
       </div>
     </nav>
