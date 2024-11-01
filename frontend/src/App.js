@@ -89,6 +89,7 @@ const formatAbc = (abc, chords = [], just_update_chords = false) => {
     }
     return abc;
   }
+
   // Remove existing chords in the abc
   abc = remove_chords(abc);
   // Firstly, remove all lines that start with T: or C: or w:
@@ -177,6 +178,12 @@ const formatAbc = (abc, chords = [], just_update_chords = false) => {
   if (barCount < 10) {
     abc = abc + "\n|";
   }
+
+  // Replace || with |
+  abc = abc.replace(/\|\|/g, "|");
+
+  // Replace consecutive spaces with a single space
+  abc = abc.replace(/ +/g, " ");
 
   return `\n\`\`\`abc\n${abc}\n\`\`\``;
 }
@@ -285,7 +292,6 @@ export default function App() {
   }
 
   const handleSelectCandidate = (candidate) => {
-    console.log("Selected Candidate:", candidate);
     setValue(candidate);
     setOpen(false);
     setCandidates([]);
@@ -299,7 +305,7 @@ export default function App() {
     <div className="App">
       <Navbar play={play} suggestMelody={suggestMelody} setValue={setValue} formatAbc={formatAbc} suggestHarmony={suggestHarmony}/>
       <div className="preview-wrapper">
-        <Preview value={value} onEvent={onEvent} isPlaying={isPlaying} />
+        <Preview value={value} onEvent={onEvent} isPlaying={isPlaying} setValue={setValue} formatAbc={formatAbc} chords={chords}/>
       </div>
       <Editor onEditorChange={onEditorChange} defaultValue={defaultValue} value={value} />
       <CandidateModal

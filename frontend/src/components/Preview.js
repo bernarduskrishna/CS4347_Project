@@ -1,8 +1,8 @@
 import ReactMarkdown from "react-markdown";
-import Score from "../Score";
+import Score from "./Score";
 import uniqid from "uniqid";
 
-export default function Preview({ value, onEvent, isPlaying }) {
+export default function Preview({ value, onEvent, isPlaying, setValue, formatAbc, chords }) {
   const components = {
     code({ node, inline, className, children, ...props }) {
       const match = /language-(\w+)/.exec(className || "");
@@ -12,6 +12,9 @@ export default function Preview({ value, onEvent, isPlaying }) {
           notation={`${children}`.replace(/\n$/, "")}
           onEvent={onEvent}
           isPlaying={isPlaying}
+          setValue={setValue}
+          formatAbc={formatAbc}
+          chords={chords}
         />
       ) : (
         <code className={className} {...props} />
