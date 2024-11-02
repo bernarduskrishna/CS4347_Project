@@ -4,7 +4,7 @@ const options = {
   codeLens: false
 };
 
-export default function Editor2({ onEditorChange, defaultValue, value }) {
+export default function Editor2({ onEditorChange, defaultValue, value, handleEditorDidMount }) {
   return (
     <div className="editor">
       <Editor
@@ -14,6 +14,7 @@ export default function Editor2({ onEditorChange, defaultValue, value }) {
         defaultValue={defaultValue}
         onChange={onEditorChange}
         value={value}
+        onMount={handleEditorDidMount}
       />
     </div>
   );

@@ -41,6 +41,8 @@ def upload_xml():
 def suggest_melody():
     json_data = request.get_json()
     abc = json_data["abc"]
+    n_suggestions = json_data["n_suggestions"]
+    temperature = json_data["temperature"]
 
     # strip first few lines and last few lines if they are empty
     abc = abc.split("\n")
@@ -48,7 +50,7 @@ def suggest_melody():
     abc = abc[1:-1]
     abc = "\n".join(abc)
 
-    melody_suggestions = model.suggest_melodies(abc)
+    melody_suggestions = model.suggest_melodies(abc, n_suggestions, temperature)
 
     return {
         "abc": melody_suggestions
@@ -58,8 +60,10 @@ def suggest_melody():
 def suggest_harmony():
     json_data = request.get_json()
     chords = json_data["chords"]
+    n_suggestions = json_data["n_suggestions"]
+    temperature = json_data["temperature"]
 
-    harmony_suggestions = model.suggest_harmonies(chords)
+    harmony_suggestions = model.suggest_harmonies(chords, n_suggestions, temperature)
 
     return {
         "chords": harmony_suggestions

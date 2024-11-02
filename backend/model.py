@@ -17,7 +17,7 @@ ml = MusicLangPredictor('musiclang/musiclang-v2')
 tokenizer = AutoTokenizer.from_pretrained("musiclang/text-chord-predictor")
 ml_chord = AutoModelForCausalLM.from_pretrained("musiclang/text-chord-predictor")
 
-def suggest_melody(abc):
+def suggest_melody(abc, temperature):
     # save abc to temp.abc
     with open('temp.abc', 'w') as f:
         f.write(abc)
@@ -66,23 +66,23 @@ def suggest_melody(abc):
     return melody
 
 # call suggest_melody, but change seed every time
-def suggest_melodies(abc):
+def suggest_melodies(abc, n_suggestions, temperature):
     global seed
     melodies_set = set()
-    while len(melodies_set) < 5:
+    while len(melodies_set) < n_suggestions:
         # random seed
         seed = random.randint(0, 1000)
-        melody = suggest_melody(abc)
+        melody = suggest_melody(abc, temperature)
         if melody not in melodies_set and melody != "":
             melodies_set.add(melody)
     return list(melodies_set)
 
-def suggest_harmonies(chords = "CM CM"):
+def suggest_harmonies(chords, n_suggestions, temperature):
     inputs = tokenizer(chords, return_tensors='pt')
     input_ids = inputs.input_ids
     attention_mask = inputs.attention_mask
-    # torch.manual_seed(3000)
-    x = ml_chord.generate(input_ids, attention_mask=attention_mask, max_length = len(input_ids[0]) + 1, num_return_sequences=100, do_sample=True)
+
+    x = ml_chord.generate(input_ids, attention_mask=attention_mask, max_length = len(input_ids[0]) + 1, num_return_sequences=100, do_sample=True, temperature=temperature)
     tally = {}
     for a in x:
         d = tokenizer.decode(a, skip_special_tokens=True)
@@ -94,8 +94,8 @@ def suggest_harmonies(chords = "CM CM"):
     # Get top 5 most common suggestions
     tally = sorted(tally.items(), key=lambda x: x[1], reverse=True)
     if tally[0] == "":
-        tally = [x[0] for x in tally[1:6]]
+        tally = [x[0] for x in tally[1:1 + n_suggestions]]
     else:
-        tally = [x[0] for x in tally[:5]]
+        tally = [x[0] for x in tally[:n_suggestions]]
     
     return tally

@@ -1,11 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 import * as Tone from "tone";
 
 import Editor from "./Editor";
 import Preview from "./components/Preview";
 import Navbar from "./components/Navbar";
-import { Dialog, DialogTitle, DialogContent, Typography } from "@mui/material";
+import { Dialog, DialogTitle, DialogContent, Typography, Box, Fab, Slider } from "@mui/material";
+
+import minim from './resources/minim.png';
+import crotchet from './resources/crotchet.png';
+import quaver from './resources/quaver.png';
+import semibreve from './resources/semibreve.png';
 
 import "./styles.css";
 
@@ -200,10 +205,46 @@ export default function App() {
   const [isPlaying, setPlaying] = useState(false);
   const [candidates, setCandidates] = useState([]);
 
+  const [nSuggestions, setNSuggestions] = useState(5);
+  const [temperature, setTemperature] = useState(0.9);
+
   const [open, setOpen] = useState(false);
 
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
+
+  const editorRef = useRef(null);
+
+  function handleEditorDidMount(editor, monaco) {
+    editorRef.current = editor;
+  }
+
+  const posNewNotes = [
+    "quaver",
+    "crotchet",
+    "minim",
+    "semibreve"
+  ]
+
+  const getNotePng = (note) => {
+    return note == 'quaver'
+      ? quaver
+      : note == 'crotchet'
+        ? crotchet
+        : note == 'minim'
+          ? minim
+          : semibreve;
+  }
+
+  const getNewNote = (note) => {
+    return note == 'quaver'
+      ? "C"
+      : note == 'crotchet'
+        ? "C2"
+        : note == 'minim'
+          ? "C4"
+          : "C8";
+  }
 
   const suggestMelody = () => {
     fetch("/suggest_melody", {
@@ -211,7 +252,7 @@ export default function App() {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ "abc": remove_chords(value) }),
+      body: JSON.stringify({ "abc": remove_chords(value), "temperature": temperature, "n_suggestions": nSuggestions }),
     }).then((res) => res.json()).then((data) => {
       const formattedAbcs = data["abc"].map((abc) => formatAbc(abc, chords));
       setCandidates(formattedAbcs);
@@ -247,7 +288,7 @@ export default function App() {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ "chords": chords.join(" ") }),
+      body: JSON.stringify({ "chords": chords.join(" "), "temperature": temperature, "n_suggestions": nSuggestions }),
     }).then((res) => res.json()).then((data) => {
       const chords_suggestions = data['chords'].map((chord) => chord.split(" "));
       const formattedAbcs = chords_suggestions.map((chords) => formatAbc(value, chords, true));
@@ -301,13 +342,65 @@ export default function App() {
     update_chords();
   }, [value]);
 
+  function insertTextAtCursor(text) {
+    const editor = editorRef.current;
+    if (editor) {
+      const position = editor.getPosition();
+
+      // Add text to the position
+      editor.executeEdits("", [{ range: {
+        startLineNumber: position.lineNumber,
+        startColumn: position.column,
+        endLineNumber: position.lineNumber,
+        endColumn: position.column
+      }, text: " " + text }]);
+    }
+  }
+
+  const addNoteOnClick = (note) => {
+    const newNote = getNewNote(note);
+
+    insertTextAtCursor(newNote);
+  }
+
   return (
     <div className="App">
       <Navbar play={play} suggestMelody={suggestMelody} setValue={setValue} formatAbc={formatAbc} suggestHarmony={suggestHarmony}/>
       <div className="preview-wrapper">
+        <Box className='secondBar' sx={{ '& > :not(style)': { m: 1 } }}>
+          <Box className='addNoteBox' sx={{ '& > :not(style)': { m: 1 } }}>
+            <h1 className='secondBarText'>Add Note: </h1>
+            {posNewNotes.map((note) => (
+              <Fab key={note} onClick={() => {addNoteOnClick(note)}} style={{width: '40px', height: '40px'}}>
+                <img src={getNotePng(note)} alt={note} style={{width: '50%', height: 'auto'}} />
+              </Fab>
+            ))}
+          </Box>
+          <Box className='paramsBox' sx={{ '& > :not(style)': { m: 1 } }}>
+            {/* Use Slider from materialui to adjust temperature and nSuggestions */}
+            <h1 className='secondBarText'>Temperature: {temperature}</h1>
+            <Slider
+              value={temperature}
+              onChange={(event, newValue) => setTemperature(newValue)}
+              min={0.1}
+              max={1}
+              step={0.1}
+              style={{width: '150px'}}
+            />
+            <h1 className='secondBarText'>Number Of Suggestions: {nSuggestions}</h1>
+            <Slider
+              value={nSuggestions}
+              onChange={(event, newValue) => setNSuggestions(newValue)}
+              min={1}
+              max={6}
+              step={1}
+              style={{width: '150px'}}
+            />
+          </Box>
+        </Box>
         <Preview value={value} onEvent={onEvent} isPlaying={isPlaying} setValue={setValue} formatAbc={formatAbc} chords={chords}/>
       </div>
-      <Editor onEditorChange={onEditorChange} defaultValue={defaultValue} value={value} />
+      <Editor onEditorChange={onEditorChange} defaultValue={defaultValue} value={value} handleEditorDidMount={handleEditorDidMount} />
       <CandidateModal
         candidates={candidates}
         open={open}

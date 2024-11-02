@@ -51,3 +51,29 @@ body {
   height: 100%; 
   width: auto;  
 }
+
+.secondBar {
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.addNoteBox {
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
+  align-items: center;
+}
+
+.paramsBox {
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
+  align-items: center;
+}
+
+.secondBarText {
+  font-size: 1.2rem;
+}
