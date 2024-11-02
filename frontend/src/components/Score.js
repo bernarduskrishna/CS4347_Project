@@ -97,11 +97,11 @@ const getOneOctaveUp = (note) => {
   const accidentals = note_w_accidentals_and_dur.match(/\^+/g);
   const octave = note_w_accidentals_and_dur.match(/,|'/g);
   const duration = note_w_accidentals_and_dur.match(/\d+/g);
-  const pure_note = note_w_accidentals_and_dur.replace(/,|\^|\d+/g, "");
+  const pure_note = note_w_accidentals_and_dur.replace(/,|'|\^|\d+/g, "");
 
   return components.length > 1 
-      ? `${components[0] ?? ""} ${accidentals ?? ""}${pure_note ?? ""}'${octave ?? ""}${duration ?? ""}` 
-      : `${accidentals ?? ""}${pure_note ?? ""}'${octave ?? ""}${duration ?? ""}`;
+      ? `${components[0] ?? ""} ${accidentals ? accidentals.join("") : ""}${pure_note ?? ""}'${octave ? octave.join("") : ""}${duration ?? ""}` 
+      : `${accidentals ? accidentals.join("") : ""}${pure_note ?? ""}'${octave ? octave.join("") : ""}${duration ?? ""}`;
 }
 
 const getOneOctaveDown = (note) => {
@@ -116,15 +116,15 @@ const getOneOctaveDown = (note) => {
   const accidentals = note_w_accidentals_and_dur.match(/\^+/g);
   const octave = note_w_accidentals_and_dur.match(/,|'/g);
   const duration = note_w_accidentals_and_dur.match(/\d+/g);
-  const pure_note = note_w_accidentals_and_dur.replace(/,|\^|\d+/g, "");
+  const pure_note = note_w_accidentals_and_dur.replace(/,|'|\^|\d+/g, "");
 
   return components.length > 1 
-      ? `${components[0] ?? ""} ${accidentals ?? ""}${pure_note ?? ""},${octave ?? ""}${duration ?? ""}` 
-      : `${accidentals ?? ""}${pure_note ?? ""},${octave ?? ""}${duration ?? ""}`;
+      ? `${components[0] ?? ""} ${accidentals ? accidentals.join("") : ""}${pure_note ?? ""},${octave ? octave.join("") : ""}${duration ?? ""}` 
+      : `${accidentals ? accidentals.join("") : ""}${pure_note ?? ""},${octave ? octave.join("") : ""}${duration ?? ""}`;
 }
 
-const getNewNote = (note) => {
-  const components = note.split(/\s+/).filter((component) => component !== "");
+const getNewNote = (note, selectedNote) => {
+  const components = selectedNote.split(/\s+/).filter((component) => component !== "");
   const note_w_accidentals_and_dur = components[components.length - 1];
 
   if (!note_w_accidentals_and_dur) {
@@ -135,7 +135,6 @@ const getNewNote = (note) => {
   const accidentals = note_w_accidentals_and_dur.match(/\^+/g);
   const octave = note_w_accidentals_and_dur.match(/,|'/g);
   const duration = note_w_accidentals_and_dur.match(/\d+/g);
-  const pure_note = note_w_accidentals_and_dur.replace(/,|\^|\d+/g, "");
 
   return components.length > 1 
       ? `${components[0] ?? ""} ${accidentals ?? ""}${note}${octave ?? ""}${duration ?? ""}` 
@@ -148,61 +147,69 @@ export default function Score({ notation, id, onEvent, isPlaying, setValue, form
   const [selected, setSelected] = useState(false);
   const [selectedNote, setSelectedNote] = useState("");
 
-  document.addEventListener('keydown', function(event) {
-    // if shift and arrowup is pressed, go one octave up
-    if(event.key == 'ArrowUp' && event.shiftKey && selected) {
-      const new_note = getOneOctaveUp(selectedNote);
-      setSelectedNote(new_note);
+  useEffect(() => {
+    const eventListener = (event) => {
+      // if shift and arrowup is pressed, go one octave up
+      if(event.key == 'ArrowUp' && event.shiftKey && selected) {
+        const new_note = getOneOctaveUp(selectedNote);
+        setSelectedNote(new_note);
+  
+        let new_notation = notation.slice(0, startChar) + new_note + " " + notation.slice(endChar);
+  
+        setEndChar(startChar + new_note.length);
+  
+        setValue(formatAbc(new_notation, chords));
+      }
+      // if shift and arrowdown is pressed, go one octave down
+      else if(event.key == 'ArrowDown' && event.shiftKey && selected) {
+        const new_note = getOneOctaveDown(selectedNote);
+        setSelectedNote(new_note);
+  
+        let new_notation = notation.slice(0, startChar) + new_note + " " + notation.slice(endChar);
+  
+        setEndChar(startChar + new_note.length);
+  
+        setValue(formatAbc(new_notation, chords));
+      }
+      else if(event.key == "ArrowUp" && selected) {
+        const new_note = getOneSemitoneUp(selectedNote);
+        setSelectedNote(new_note);
+  
+        let new_notation = notation.slice(0, startChar) + new_note + " " + notation.slice(endChar);
+  
+        setEndChar(startChar + new_note.length);
+  
+        setValue(formatAbc(new_notation, chords));
+      }
+      else if(event.key == 'ArrowDown' && selected) {
+        const new_note = getOneSemitownDown(selectedNote);
+        setSelectedNote(new_note);
+  
+        let new_notation = notation.slice(0, startChar) + new_note + " " + notation.slice(endChar);
+  
+        setEndChar(startChar + new_note.length);
+  
+        setValue(formatAbc(new_notation, chords));
+      }
+      // if C, D, E, F, G, A, B, c, d, e, f, g, a, b is pressed, change the selected note to that note
+      else if (event.key.match(/^[a-gA-G]$/) && event.key.length === 1 && selected) {
+        const new_note = getNewNote(event.key.toUpperCase(), selectedNote);
+        setSelectedNote(new_note);
+  
+        let new_notation = notation.slice(0, startChar) + new_note + " " + notation.slice(endChar);
+  
+        setEndChar(startChar + new_note.length);
+  
+        setValue(formatAbc(new_notation, chords));
+      }
+    };
 
-      let new_notation = notation.slice(0, startChar) + new_note + " " + notation.slice(endChar);
+    window.addEventListener('keydown', eventListener);
 
-      setEndChar(startChar + new_note.length);
-
-      setValue(formatAbc(new_notation, chords));
+    return () => {
+      window.removeEventListener('keydown', eventListener);
     }
-    // if shift and arrowdown is pressed, go one octave down
-    else if(event.key == 'ArrowDown' && event.shiftKey && selected) {
-      const new_note = getOneOctaveDown(selectedNote);
-      setSelectedNote(new_note);
-
-      let new_notation = notation.slice(0, startChar) + new_note + " " + notation.slice(endChar);
-
-      setEndChar(startChar + new_note.length);
-
-      setValue(formatAbc(new_notation, chords));
-    }
-    else if(event.key == "ArrowUp" && selected) {
-      const new_note = getOneSemitoneUp(selectedNote);
-      setSelectedNote(new_note);
-
-      let new_notation = notation.slice(0, startChar) + new_note + " " + notation.slice(endChar);
-
-      setEndChar(startChar + new_note.length);
-
-      setValue(formatAbc(new_notation, chords));
-    }
-    else if(event.key == 'ArrowDown' && selected) {
-      const new_note = getOneSemitownDown(selectedNote);
-      setSelectedNote(new_note);
-
-      let new_notation = notation.slice(0, startChar) + new_note + " " + notation.slice(endChar);
-
-      setEndChar(startChar + new_note.length);
-
-      setValue(formatAbc(new_notation, chords));
-    }
-    // if C, D, E, F, G, A, B, c, d, e, f, g, a, b is pressed, change the selected note to that note
-    else if (event.key.match(/^[a-gA-G]$/) && event.key.length === 1 && selected) {
-      const new_note = getNewNote(event.key.toUpperCase());
-      setSelectedNote(new_note);
-
-      let new_notation = notation.slice(0, startChar) + new_note + " " + notation.slice(endChar);
-
-      setEndChar(startChar + new_note.length);
-
-      setValue(formatAbc(new_notation, chords));
-    }
-  });
+  }, [selected, selectedNote, notation, startChar, endChar, chords]);
 
   const onClick = (event) => {
     const start_char = event.startChar;
