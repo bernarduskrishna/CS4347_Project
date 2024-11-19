@@ -2,18 +2,21 @@ import ReactMarkdown from "react-markdown";
 import Score from "./Score";
 import uniqid from "uniqid";
 
-export default function Preview({ value, onEvent, isPlaying, setValue, formatAbc, chords }) {
+const formatABCMarkdown = (abc) => {
+  return `\`\`\`abc\n${abc}\n\`\`\``;
+}
+
+export default function Preview({ value, onEvent, isPlaying, setValue, chords }) {
   const components = {
     code({ node, inline, className, children, ...props }) {
       const match = /language-(\w+)/.exec(className || "");
       return !inline && match && match[1] === "abc" ? (
         <Score
           id={uniqid()}
-          notation={`${children}`.replace(/\n$/, "")}
+          notation={children}
           onEvent={onEvent}
           isPlaying={isPlaying}
           setValue={setValue}
-          formatAbc={formatAbc}
           chords={chords}
         />
       ) : (
@@ -24,7 +27,7 @@ export default function Preview({ value, onEvent, isPlaying, setValue, formatAbc
 
   return (
     <ReactMarkdown className="preview" components={components}>
-      {value}
+      {formatABCMarkdown(value.replace(/\n$/, "").replace(/\n+/g, '\n').trim())}
     </ReactMarkdown>
   );
 }

@@ -1,0 +1,7 @@
+numpy
+torch
+flask
+flask-cors
+musiclang-predict
+music21
+transformers

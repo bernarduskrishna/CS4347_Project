@@ -1,217 +1,49 @@
 import { useState, useEffect, useRef } from "react";
+import { Backdrop, CircularProgress, Divider, Paper } from "@mui/material";
 
-import * as Tone from "tone";
-
-import Editor from "./Editor";
-import Preview from "./components/Preview";
+import AISettingsModal from "./components/AISettingsModal";
+import CandidateModal from "./components/CandidateModal";
+import Editor from "./components/Editor";
 import Navbar from "./components/Navbar";
-import { Dialog, DialogTitle, DialogContent, Typography, Box, Fab, Slider } from "@mui/material";
+import Preview from "./components/Preview";
+import Toolbar from "./components/Toolbar";
 
-import minim from './resources/minim.png';
-import crotchet from './resources/crotchet.png';
-import quaver from './resources/quaver.png';
-import semibreve from './resources/semibreve.png';
+import { 
+  DEFAULT_VALUE, 
+  DEFAULT_CHORDS, 
+  PIANO,
+  addFiller,
+  addChords,
+  formatChords,
+  removeChords,
+  addVLines,
+  extractVLines,
+  formatABCGeneration
+} from './utils';
 
 import "./styles.css";
 
-const defaultValue = `X: 1
-M: 4/4
-K: C
-V:1                             clef=treble staff=1
- C3 D E3 C | E2 C2 E4    |`
-
-const defaultChords = ["CM", "CM"]
-
-const piano = new Tone.Sampler({
-	urls: {
-		C4: "C4.mp3",
-		"D#4": "Ds4.mp3",
-		"F#4": "Fs4.mp3",
-		A4: "A4.mp3",
-	},
-	release: 1,
-	baseUrl: "https://tonejs.github.io/audio/salamander/",
-}).toDestination();
-
-// Assuming Preview is already a defined component that renders a candidate
-const CandidateModal = ({ candidates, open, onClose, onSelectCandidate }) => {
-  return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      fullWidth
-      maxWidth="lg" // This makes the modal quite large
-      PaperProps={{ style: { minHeight: "80vh" } }} // Customize to make the height large enough
-    >
-      <DialogTitle>Select a Candidate</DialogTitle>
-      <DialogContent>
-        <div className="candidates">
-          {candidates.map((candidate, index) => (
-            <div
-              key={index}
-              className="candidate"
-              style={{ marginBottom: "16px", cursor: "pointer" }} // Spacing between candidates and pointer for selectability
-              onClick={() => onSelectCandidate(candidate)} // Call the function when a candidate is clicked
-            >
-              <Typography variant="h6" component="div">
-                Candidate {index + 1}
-              </Typography>
-              <Preview value={candidate} onEvent={() => {}} isPlaying={false}/>
-            </div>
-          ))}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
-const formatAbc = (abc, chords = [], just_update_chords = false) => {
-  if (just_update_chords) {
-    abc = remove_chords(abc);
-    let lines = abc.split("\n");
-    let vIndex = lines.findIndex((line) => line.startsWith("V:1"));
-    let vLine = lines[vIndex + 1];
-    let newVLine = "";
-
-    if (chords.length > 0) {
-      newVLine += `"${chords[0]}" `;
-      let i = 1;
-
-      for (let j = 0; j < vLine.length; j++) {
-        if (vLine[j] === "|") {
-          newVLine += "|";
-          if (i < chords.length) {
-            newVLine += ` "${chords[i]}" `;
-            i++;
-          }
-        } else {
-          newVLine += vLine[j];
-        }
-      }
-
-      lines[vIndex + 1] = newVLine;
-      abc = lines.join("\n");
-    }
-    return abc;
-  }
-
-  // Remove existing chords in the abc
-  abc = remove_chords(abc);
-  // Firstly, remove all lines that start with T: or C: or w:
-  abc = abc.split("\n").filter((line) => {
-    return !line.startsWith("T:") && !line.startsWith("C:") && !line.startsWith("w:");
-  }).join("\n");
-  // If last line is empty line, remove it
-  if (abc[abc.length - 1] === "\n") {
-    abc = abc.slice(0, -1);
-  }
-  // If there are multiple V: lines, remove all but the first one
-  let vCount = 0;
-
-  abc = abc.split("\n").filter((line) => {
-    if (line.startsWith("V:")) {
-      if (vCount === 0) {
-        vCount++;
-        return true;
-      }
-      return false;
-    }
-    return true;
-  }
-  ).join("\n");
-
-  // Change all occurrences of |] to |
-  abc = abc.replace(/\|]/g, "|");
-
-  // Using regex, remove all occurrences of %{any_number}
-  abc = abc.replace(/%\d+/g, "");
-
-  // From the first |, remove all subsequent occurrences of \n
-  let firstBarIndex = abc.indexOf("|");
-  abc = abc.slice(0, firstBarIndex + 1) + abc.slice(firstBarIndex + 1).replace(/\n/g, "");
-
-  // Add the chords with "" around them, in every bar
-  let lines = abc.split("\n");
-  let vIndex = lines.findIndex((line) => line.startsWith("V:1"));
-  let vLine = lines[vIndex + 1];
-  let newVLine = "";
-
-  if (chords.length > 0) {
-    newVLine += `"${chords[0]}" `;
-    let i = 1;
-
-    for (let j = 0; j < vLine.length; j++) {
-      if (vLine[j] === "|") {
-        newVLine += "|";
-        if (i < chords.length) {
-          newVLine += ` "${chords[i]}" `;
-          i++;
-        }
-      } else {
-        newVLine += vLine[j];
-      }
-    }
-
-    lines[vIndex + 1] = newVLine;
-    abc = lines.join("\n");
-  }
-
-  // If there are 10 or more | characters, add \n after every 10th |
-  let barCountAfter = 0;
-  let newAbc = "";
-  for (let i = 0; i < abc.length; i++) {
-    if (abc[i] === "|") {
-      barCountAfter++;
-    }
-    newAbc += abc[i];
-    if (barCountAfter === 10) {
-      barCountAfter = 0;
-      newAbc += "\n";
-    }
-  }
-
-  abc = newAbc;
-
-  // If there are fewer than 10 | characters, add one | on the last line
-  let barCount = 0;
-  for (let i = 0; i < abc.length; i++) {
-    if (abc[i] === "|") {
-      barCount++;
-    }
-  }
-
-  if (barCount < 10) {
-    abc = abc + "\n|";
-  }
-
-  // Replace || with |
-  abc = abc.replace(/\|\|/g, "|");
-
-  // Replace consecutive spaces with a single space
-  abc = abc.replace(/ +/g, " ");
-
-  return `\n\`\`\`abc\n${abc}\n\`\`\``;
-}
-
-const remove_chords = (abc) => {
-  // Just remove all "" enclosed strings
-  return abc.replace(/".*?"/g, "");
-}
-
 export default function App() {
-  const [chords, setChords] = useState(defaultChords);
 
-  const [value, setValue] = useState(formatAbc(defaultValue, chords));
+  const [chords, setChords] = useState(DEFAULT_CHORDS);
+  const [value, setValue] = useState(addChords(DEFAULT_VALUE, chords));
+
   const [isPlaying, setPlaying] = useState(false);
-  const [candidates, setCandidates] = useState([]);
 
-  const [nSuggestions, setNSuggestions] = useState(5);
+  const [candidates, setCandidates] = useState([]);
+  const [nSuggestions, setNSuggestions] = useState(3);
   const [temperature, setTemperature] = useState(0.9);
 
-  const [open, setOpen] = useState(false);
+  const [backdropOpen, setBackdropOpen] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
 
-  const handleOpen = () => setOpen(true);
-  const handleClose = () => setOpen(false);
+  const handleEditorToggle = () => setEditorOpen(!editorOpen);
+  const handleModalOpen = () => setModalOpen(true);
+  const handleModalClose = () => setModalOpen(false);
+  const handleSettingsOpen = () => setSettingsOpen(true);
+  const handleSettingsClose = () => setSettingsOpen(false);
 
   const editorRef = useRef(null);
 
@@ -219,104 +51,8 @@ export default function App() {
     editorRef.current = editor;
   }
 
-  const posNewNotes = [
-    "quaver",
-    "crotchet",
-    "minim",
-    "semibreve"
-  ]
-
-  const getNotePng = (note) => {
-    return note == 'quaver'
-      ? quaver
-      : note == 'crotchet'
-        ? crotchet
-        : note == 'minim'
-          ? minim
-          : semibreve;
-  }
-
-  const getNewNote = (note) => {
-    return note == 'quaver'
-      ? "C"
-      : note == 'crotchet'
-        ? "C2"
-        : note == 'minim'
-          ? "C4"
-          : "C8";
-  }
-
-  const suggestMelody = () => {
-    fetch("/suggest_melody", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ "abc": remove_chords(value), "temperature": temperature, "n_suggestions": nSuggestions }),
-    }).then((res) => res.json()).then((data) => {
-      const formattedAbcs = data["abc"].map((abc) => formatAbc(abc, chords));
-      setCandidates(formattedAbcs);
-      handleOpen();
-    })
-  }
-
-  const update_chords = () => {
-    // extract chords from the value. chords are those characters that are enclosed in double quotes
-    let newChords = [];
-    let chord = "";
-    let inChord = false;
-
-    for (let i = 0; i < value.length; i++) {
-      if (value[i] === '"') {
-        if (inChord) {
-          newChords.push(chord);
-          chord = "";
-          inChord = false;
-        } else {
-          inChord = true;
-        }
-      } else if (inChord) {
-        chord += value[i];
-      }
-    }
-    setChords(newChords);
-  }
-
-  const suggestHarmony = () => {
-    fetch("/suggest_harmony", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ "chords": chords.join(" "), "temperature": temperature, "n_suggestions": nSuggestions }),
-    }).then((res) => res.json()).then((data) => {
-      const chords_suggestions = data['chords'].map((chord) => chord.split(" "));
-      const formattedAbcs = chords_suggestions.map((chords) => formatAbc(value, chords, true));
-      setCandidates(formattedAbcs);
-      handleOpen();
-    })
-  }
-
   function onEditorChange(value, event) {
     setValue(value);
-    // Extract chords from the value. Chords will be those characters that are enclosed in double quotes
-    let newChords = [];
-    let chord = "";
-    let inChord = false;
-    for (let i = 0; i < value.length; i++) {
-      if (value[i] === '"') {
-        if (inChord) {
-          newChords.push(chord);
-          chord = "";
-          inChord = false;
-        } else {
-          inChord = true;
-        }
-      } else if (inChord) {
-        chord += value[i];
-      }
-    }
-    setChords(newChords);
   }
 
   function onEvent(event) {
@@ -324,87 +60,97 @@ export default function App() {
       return;
     }
     event.notes.forEach((n) => {
-      piano.triggerAttackRelease(n.name, n.duration);
+      PIANO.triggerAttackRelease(n.name, n.duration);
     });
+    setPlaying(false);
   }
 
-  function play() {
-    setPlaying(true);
-  }
+  const play = () => setPlaying(true);
 
   const handleSelectCandidate = (candidate) => {
     setValue(candidate);
-    setOpen(false);
+    setModalOpen(false);
     setCandidates([]);
   };
 
-  useEffect(() => {
-    update_chords();
-  }, [value]);
-
-  function insertTextAtCursor(text) {
-    const editor = editorRef.current;
-    if (editor) {
-      const position = editor.getPosition();
-
-      // Add text to the position
-      editor.executeEdits("", [{ range: {
-        startLineNumber: position.lineNumber,
-        startColumn: position.column,
-        endLineNumber: position.lineNumber,
-        endColumn: position.column
-      }, text: " " + text }]);
-    }
+  const suggestMelody = () => {
+    const extraction = extractVLines(value);
+    const processedValue = formatABCGeneration(removeChords(extraction[1]));
+    console.log(processedValue)
+    setBackdropOpen(true);
+    fetch("/suggest_melody", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ "abc": processedValue, "temperature": temperature, "n_suggestions": nSuggestions }),
+    }).then((res) => res.json()).then((data) => {
+      const formattedAbcs = data["abc"].map((abc) => addVLines(formatABCGeneration(abc), extraction[0]));
+      setCandidates(formattedAbcs);
+      handleModalOpen();
+      setBackdropOpen(false);
+    })
   }
 
-  const addNoteOnClick = (note) => {
-    const newNote = getNewNote(note);
-
-    insertTextAtCursor(newNote);
+  const suggestHarmony = () => {
+    setBackdropOpen(true);
+    fetch("/suggest_harmony", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ "chords": formatChords(chords).join(" "), "temperature": temperature, "n_suggestions": nSuggestions }),
+    }).then((res) => res.json()).then((data) => {
+      const chords_suggestions = data['chords'].map((chord) => chord.split(" "));
+      const extraction = extractVLines(value);
+      const abc_chords_removed = addVLines(removeChords(extraction[1]), extraction[0]);
+      const formattedAbcs = chords_suggestions.map((chords) => addChords(addFiller(abc_chords_removed), chords));
+      setCandidates(formattedAbcs);
+      handleModalOpen();
+      setBackdropOpen(false);
+    })
   }
 
   return (
     <div className="App">
-      <Navbar play={play} suggestMelody={suggestMelody} setValue={setValue} formatAbc={formatAbc} suggestHarmony={suggestHarmony}/>
-      <div className="preview-wrapper">
-        <Box className='secondBar' sx={{ '& > :not(style)': { m: 1 } }}>
-          <Box className='addNoteBox' sx={{ '& > :not(style)': { m: 1 } }}>
-            <h1 className='secondBarText'>Add Note: </h1>
-            {posNewNotes.map((note) => (
-              <Fab key={note} onClick={() => {addNoteOnClick(note)}} style={{width: '40px', height: '40px'}}>
-                <img src={getNotePng(note)} alt={note} style={{width: '50%', height: 'auto'}} />
-              </Fab>
-            ))}
-          </Box>
-          <Box className='paramsBox' sx={{ '& > :not(style)': { m: 1 } }}>
-            {/* Use Slider from materialui to adjust temperature and nSuggestions */}
-            <h1 className='secondBarText'>Temperature: {temperature}</h1>
-            <Slider
-              value={temperature}
-              onChange={(event, newValue) => setTemperature(newValue)}
-              min={0.1}
-              max={1}
-              step={0.1}
-              style={{width: '150px'}}
-            />
-            <h1 className='secondBarText'>Number Of Suggestions: {nSuggestions}</h1>
-            <Slider
-              value={nSuggestions}
-              onChange={(event, newValue) => setNSuggestions(newValue)}
-              min={1}
-              max={6}
-              step={1}
-              style={{width: '150px'}}
-            />
-          </Box>
-        </Box>
-        <Preview value={value} onEvent={onEvent} isPlaying={isPlaying} setValue={setValue} formatAbc={formatAbc} chords={chords}/>
+      <Navbar 
+        value={value}
+        setValue={setValue}
+        play={play}
+        handleSettingsOpen={handleSettingsOpen}
+        suggestMelody={suggestMelody}
+        suggestHarmony={suggestHarmony}
+      />
+      <Divider sx={{ borderColor: '#383b4a' }}/>
+      <Toolbar 
+        editorRef={editorRef}
+        editorOpen={editorOpen}
+        handleEditorToggle={handleEditorToggle}
+      />
+      <div className="align-wrapper">
+        <Paper className="preview-wrapper">
+          <Preview value={value} onEvent={onEvent} isPlaying={isPlaying} setValue={setValue} chords={chords}/>
+        </Paper>
       </div>
-      <Editor onEditorChange={onEditorChange} defaultValue={defaultValue} value={value} handleEditorDidMount={handleEditorDidMount} />
+      <Editor editorOpen={editorOpen} onEditorChange={onEditorChange} defaultValue={DEFAULT_VALUE} value={value} handleEditorDidMount={handleEditorDidMount} />
+      <Backdrop
+        sx={(theme) => ({ color: '#fff', zIndex: theme.zIndex.drawer + 1 })}
+        open={backdropOpen}
+      >
+        <CircularProgress color="inherit" />
+      </Backdrop>
+      <AISettingsModal 
+        settingsOpen={settingsOpen}
+        handleSettingsClose={handleSettingsClose}
+        nSuggestions={nSuggestions}
+        setNSuggestions={setNSuggestions}
+        temperature={temperature}
+        setTemperature={setTemperature}        
+      />
       <CandidateModal
+        modalOpen={modalOpen}
+        handleModalClose={handleModalClose}
         candidates={candidates}
-        open={open}
-        onClose={handleClose}
         onSelectCandidate={handleSelectCandidate}
       />
     </div>

@@ -2,56 +2,81 @@
 
 import * as React from 'react';
 import { styled } from '@mui/material/styles';
-import { Button } from '@mui/material';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
+import Avatar from '@mui/material/Avatar';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
 
-const Navbar = (props) => {
+import MenuIcon from '@mui/icons-material/Menu';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+
+import AI_Icon from '../resources/ai.png';
+
+const Navbar = ({ value, setValue, play, handleSettingsOpen, suggestMelody, suggestHarmony }) => {
+
+  // For Burger Bar Menu
+  const [menuAnchorEl, setMenuAnchorEl] = React.useState(null);
+  const menuOpen = Boolean(menuAnchorEl);
+  const handleMenuClick = (event) => {
+    setMenuAnchorEl(event.currentTarget);
+  };
+  const handleMenuClose = () => {
+    setMenuAnchorEl(null);
+  };
+
+  // For AI Menu
+  const [AIMenuAnchorEl, setAIMenuAnchorEl] = React.useState(null);
+  const AIMenuOpen = Boolean(AIMenuAnchorEl);
+  const handleAIMenuClick = (event) => {
+    setAIMenuAnchorEl(event.currentTarget);
+  };
+  const handleAIMenuClose = () => {
+    setAIMenuAnchorEl(null);
+  };
 
   const handleImportXML = async (event) => {
     const file = event.target.files?.[0];
-    console.log(file);
     if (!file) return;
 
     const formData = new FormData();
     formData.append('musicxml', file);
 
-    try {
-      const response = await fetch('/upload_xml', {
-        method: 'POST',
-        body: formData,
-      });
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
+    fetch("/upload_xml", {
+      method: 'POST',
+      body: formData,
+    }).then((res) => res.json()).then((data) => {
+      const result_abc = data['result'];
+      setValue(result_abc);
+    });
+
+  };
+
+  const handleExportXML = async (event) => {
+    fetch("/download_xml", {
+      method: 'POST',
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({'abc': value.split('\n')}),
+    }).then((res) => {
+      if (res.ok) {
+        // Check if the response is okay, and if so, start the download
+        const contentDisposition = res.headers.get('Content-Disposition');
+        const fileName = contentDisposition.split('filename=')[1].replace(/"/g, ''); // Extract filename from header
+  
+        return res.blob().then((blob) => {
+          const link = document.createElement('a');
+          const url = window.URL.createObjectURL(blob);
+          link.href = url;
+          link.download = fileName; // Use the file name from the response
+          link.click();
+          window.URL.revokeObjectURL(url);
+        });
+      } else {
+        throw new Error('Failed to export XML');
       }
-      const result = await response.json();
-      const result_abc = result['result'];
-      props.setValue(props.formatAbc(result_abc));
-
-    } catch (error) {
-      console.error('Error:', error);
-    }
- 
-  };
-
-  const handleExportXML = () => {
-    console.log("Play clicked");
-  };
-
-  const handleImport = () => {
-    console.log("Play clicked");
-  };
-
-  const handlePlay = () => {
-    props.play()
-  };
-
-  const handleSuggestMelody = () => {
-    props.suggestMelody()
-  };
-
-  const handleSuggestHarmony = () => {
-    props.suggestHarmony()
+    });
   };
 
   const VisuallyHiddenInput = styled('input')({
@@ -67,68 +92,109 @@ const Navbar = (props) => {
   });
 
   return (
-    <nav className="flex justify-between items-center p-4 bg-gray-800">
+    <nav className="fixed relative top-0 flex justify-between items-center p-4 bg-gray-800">
       <div className="flex space-x-4 text-white text-xl">
-        <h1>CS4347 Project</h1>
-        <Button
-          component="label"
-          role={undefined}
-          variant="contained"
-          tabIndex={-1}
-          startIcon={<CloudUploadIcon />}
+        <IconButton 
+          aria-label="menu"
+          id="basic-button"
+          aria-controls={menuOpen ? 'basic-menu' : undefined}
+          aria-haspopup="true"
+          aria-expanded={menuOpen ? 'true' : undefined}
+          onClick={handleMenuClick}
         >
-          Import XML
-          <VisuallyHiddenInput
-            type="file"
-            accept=".musicxml"
-            onChange={handleImportXML}
-            multiple
-          />
-        </Button>
-        <Button
-          variant="contained"
-          color="error"
-          onClick={handleExportXML}
+          <MenuIcon style={{ color: 'white' }} />
+        </IconButton>
+        <Menu
+          id="basic-menu"
+          anchorEl={menuAnchorEl}
+          open={menuOpen}
+          onClose={handleMenuClose}
+          MenuListProps={{
+            'aria-labelledby': 'basic-button',
+          }}
         >
-          Export XML
-        </Button>
-        <Button
-          variant="contained"
-          color="error"
-          onClick={handleImport}
-        >
-          Import MP3
-        </Button>
-        <Button
-          variant="contained"
-          color="error"
-          onClick={handleImport}
-        >
-          Export MP3
-        </Button>
-    </div>
+          <MenuItem
+            component="label"
+            role={undefined}
+            variant="text"
+            tabIndex={-1}
+          >
+            Import MusicXML / XML
+            <VisuallyHiddenInput
+              type="file"
+              onChange={handleImportXML}
+              multiple
+            />
+          </MenuItem>
+          <MenuItem 
+            component="label"
+            role={undefined}
+            variant="contained"
+            tabIndex={-1}
+            onClick={handleExportXML}
+          >
+            Export MusicXML
+          </MenuItem>
+        </Menu>
+        <p className="mt-1">ScoreGen</p>
+      </div>
       <div className="flex space-x-4">
         <Button
           variant="contained"
           color="success"
-          onClick={handlePlay}
+          onClick={() => play()}
         >
-          Play
+          <PlayArrowIcon style={{ color: 'white' }} />
         </Button>
-        <Button
-          variant="contained"
-          color="success"
-          onClick={handleSuggestMelody}
+        <Button 
+          aria-label="ai-menu"
+          variant="contained" 
+          color="info" 
+          startIcon={<Avatar src={AI_Icon} style={{ height: '32px', width: 'auto' }}/>}
+          aria-controls={AIMenuOpen ? 'ai-basic-menu' : undefined}
+          aria-haspopup="true"
+          aria-expanded={AIMenuOpen ? 'true' : undefined}
+          onClick={handleAIMenuClick}
         >
-          Suggest Melody
+          AI Ideation Helper
         </Button>
-        <Button
-          variant="contained"
-          color="success"
-          onClick={handleSuggestHarmony}
+        <Menu
+          id="ai-basic-menu"
+          anchorEl={AIMenuAnchorEl}
+          open={AIMenuOpen}
+          onClose={handleAIMenuClose}
+          MenuListProps={{
+            'aria-labelledby': 'ai-menu',
+          }}
         >
-          Suggest Harmony
-        </Button>
+          <MenuItem
+            component="label"
+            role={undefined}
+            variant="text"
+            tabIndex={-1}
+            onClick={() => suggestMelody()}
+          >
+            Suggest Melody
+          </MenuItem>
+          <MenuItem 
+            component="label"
+            role={undefined}
+            variant="contained"
+            tabIndex={-1}
+            onClick={() => suggestHarmony()}
+          >
+            Suggest Harmony
+          </MenuItem>
+          <MenuItem 
+            component="label"
+            role={undefined}
+            variant="contained"
+            tabIndex={-1}
+            onClick={() => handleSettingsOpen()}
+          >
+            AI Helper Settings
+          </MenuItem>
+        </Menu>
       </div>
     </nav>
   );

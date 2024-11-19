@@ -9,6 +9,7 @@
 body {
   margin: 0;
   font-size: 16px;
+  background-color: #1a202c;
 }
 
 .App {
@@ -16,12 +17,21 @@ body {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  /* justify-content: center; */
 }
 
 .editor {
+  background-color: black;
+  position: absolute;
+  top: 200px;
+  left: 5%;
+  transform: translateX(-50%);
+  z-index: 1300;     
+  width: 50%;
+  height: 50%;
   display: flex;
   flex: 1;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
 }
@@ -31,14 +41,24 @@ body {
   gap: 1rem;
 }
 
-.preview-wrapper {
+.align-wrapper {
+  height: 100%;
   display: flex;
-  flex: 1;
-  height: 50%;
-  padding: 1rem;
+  flex-direction: column;
+  align-items: center;
+}
+
+.preview-wrapper {
+  /* display: flex; */
+  /* flex: 1; */
+  /* height: 50%; */
+  width: 94%;
+  margin-top: 3%;
+  /* padding: 1rem; */
   overflow-y: scroll;
   flex-direction: column;
-  justify-content: space-between;
+  /* justify-content: center; */
+  align-items: center;
 }
 
 .sheet-music {
