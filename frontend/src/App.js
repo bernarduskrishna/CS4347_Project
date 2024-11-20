@@ -16,9 +16,12 @@ import {
   addChords,
   formatChords,
   removeChords,
+  addTCLines,
   addVLines,
+  extractTCLines,
   extractVLines,
-  formatABCGeneration
+  formatABCGeneration,
+  extractChords,
 } from './utils';
 
 import "./styles.css";
@@ -27,6 +30,7 @@ export default function App() {
 
   const [chords, setChords] = useState(DEFAULT_CHORDS);
   const [value, setValue] = useState(addChords(DEFAULT_VALUE, chords));
+  const [metadata, setMetadata] = useState(extractTCLines(DEFAULT_VALUE)[0]);
 
   const [isPlaying, setPlaying] = useState(false);
 
@@ -53,6 +57,7 @@ export default function App() {
 
   function onEditorChange(value, event) {
     setValue(value);
+    setChords(extractChords(value));
   }
 
   function onEvent(event) {
@@ -68,15 +73,17 @@ export default function App() {
   const play = () => setPlaying(true);
 
   const handleSelectCandidate = (candidate) => {
-    setValue(candidate);
+    setValue(addTCLines(candidate, metadata));
+    setChords(extractChords(candidate));
     setModalOpen(false);
     setCandidates([]);
   };
 
   const suggestMelody = () => {
-    const extraction = extractVLines(value);
-    const processedValue = formatABCGeneration(removeChords(extraction[1]));
-    console.log(processedValue)
+    const v_extraction = extractVLines(value);
+    const tc_extraction = extractTCLines(value);
+    setMetadata(tc_extraction[0])
+    const processedValue = formatABCGeneration(removeChords(v_extraction[1]));
     setBackdropOpen(true);
     fetch("/suggest_melody", {
       method: "POST",
@@ -85,14 +92,16 @@ export default function App() {
       },
       body: JSON.stringify({ "abc": processedValue, "temperature": temperature, "n_suggestions": nSuggestions }),
     }).then((res) => res.json()).then((data) => {
-      const formattedAbcs = data["abc"].map((abc) => addVLines(formatABCGeneration(abc), extraction[0]));
+      const formattedAbcs = data["abc"].map((abc) => addChords(addVLines(formatABCGeneration(abc), v_extraction[0]), chords));
       setCandidates(formattedAbcs);
       handleModalOpen();
       setBackdropOpen(false);
     })
   }
-
+  
   const suggestHarmony = () => {
+    const tc_extraction = extractTCLines(value);
+    setMetadata(tc_extraction[0])
     setBackdropOpen(true);
     fetch("/suggest_harmony", {
       method: "POST",
@@ -102,9 +111,9 @@ export default function App() {
       body: JSON.stringify({ "chords": formatChords(chords).join(" "), "temperature": temperature, "n_suggestions": nSuggestions }),
     }).then((res) => res.json()).then((data) => {
       const chords_suggestions = data['chords'].map((chord) => chord.split(" "));
-      const extraction = extractVLines(value);
+      const extraction = extractVLines(tc_extraction[1]);
       const abc_chords_removed = addVLines(removeChords(extraction[1]), extraction[0]);
-      const formattedAbcs = chords_suggestions.map((chords) => addChords(addFiller(abc_chords_removed), chords));
+      const formattedAbcs = chords_suggestions.map((chords) => addChords(addFiller(abc_chords_removed, chords), chords));
       setCandidates(formattedAbcs);
       handleModalOpen();
       setBackdropOpen(false);
@@ -123,6 +132,7 @@ export default function App() {
       />
       <Divider sx={{ borderColor: '#383b4a' }}/>
       <Toolbar 
+        value={value}
         editorRef={editorRef}
         editorOpen={editorOpen}
         handleEditorToggle={handleEditorToggle}

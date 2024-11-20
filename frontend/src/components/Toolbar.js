@@ -3,6 +3,10 @@
 import * as React from 'react';
 import { Box, Button, IconButton } from "@mui/material";
 
+import { 
+  extractL,
+} from '../utils';
+
 import crotchet from '../resources/crotchet_w.png';
 import dot from '../resources/dot_w.png';
 import minim from '../resources/minim_w.png';
@@ -19,7 +23,7 @@ const NOTES = [
   { name: 'rest', file: rest, duration: '' },
 ];
 
-const Toolbar = ({ editorRef, editorOpen, handleEditorToggle }) => {
+const Toolbar = ({ value, editorRef, editorOpen, handleEditorToggle }) => {
 
   const [dotActive, setDotActive] = React.useState(false);
   const [restActive, setRestActive] = React.useState(false);
@@ -48,8 +52,17 @@ const Toolbar = ({ editorRef, editorOpen, handleEditorToggle }) => {
       setRestActive(!restActive);
     } else {
       const noteChar = restActive ? 'z' : 'C';
-      const noteLength = dotActive ? Math.floor(inputNote.duration * 1.5) : inputNote.duration;
-      const newNote = noteChar + noteLength.toString();
+      const L = extractL(value);
+      let newNote = '';
+      if (0.125 / L >= 1) {
+        const noteLength = inputNote.duration * (0.125 / L);
+        const dottedNoteLength = dotActive ? noteLength * 1.5 : noteLength;
+        newNote = noteChar + dottedNoteLength.toString();
+      } else {
+        const noteLength = inputNote.duration * (0.125 / L);
+        const dottedNoteLength = dotActive ? noteLength * 1.5 : noteLength;
+        newNote = dottedNoteLength < 1 ? noteChar + '/' + (1 / dottedNoteLength).toString() : noteChar + dottedNoteLength.toString();
+      }
       insertTextAtCursor(newNote);
     }
   }

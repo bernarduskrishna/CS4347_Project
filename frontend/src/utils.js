@@ -3,15 +3,15 @@ import * as Tone from "tone";
 export const DEFAULT_VALUE = `X:1
 T:Shire - Excerpt
 C:Howard Shore
-L:1/4
+L:1/8
 M:4/4
 I:linebreak $
 K:C
 V:1 treble nm="Piano" snm="Pno."
 V:1
-| E1 G1 E1 D1 | C2 E1 G1 | A1 C'1 B1 G1 | E1 F1 E1 D1 |] %16`;
+| E2 G4 E1D1 | C4- C1C1E1G1 | A2 C'2 B2 G2 | E3 F/2E/2 D4 |] %16`;
 
-export const DEFAULT_CHORDS = ["Cmaj", "Cmaj", "Fmaj", "Gmaj"];
+export const DEFAULT_CHORDS = ["CM", "CM", "FM", "GM"];
 
 export const PIANO = new Tone.Sampler({
   urls: {
@@ -64,7 +64,29 @@ export const addChords = (abc, chords = []) => {
     lines[vIndex + 1] = newVLine;
   }
 
-  return lines.join("\n");
+  return lines.join("\n").replace(/ +/g, " ");;
+}
+
+export const extractChords = (abc) => {
+
+  // Split the lines into each line
+  let lines = abc.split("\n");
+
+  // Find the index of the last line starting with V:
+  let vIndex = lines.findLastIndex((line) => line.startsWith("V:1"));
+
+  // Extract chords from the value; Chords are those characters that are enclosed in double quotes
+  let newChords = [];
+  const chordMatch = /"\s*([CDEFGAB][a-zA-Z#]*\s*)\s*"/g;
+  let match;
+
+  // Start iterating through the lines after the last line containing V:
+  for (let i = vIndex + 1; i < lines.length; i++) {
+    while ((match = chordMatch.exec(lines[i])) !== null) {
+      newChords.push(match[1].trim());
+    }
+  }
+  return newChords;
 }
 
 export const formatChords = (chords) => {
@@ -79,16 +101,29 @@ export const formatChords = (chords) => {
   return newChords;
 }
 
-export const addFiller = (abc) => {
+export const addFiller = (abc, chords) => {
+
+  // Replace || with |
+  abc = abc.replace(/\|\|/g, "|");
+
   // Split the lines into each line
   let lines = abc.split("\n");
 
   // Find index of line where we should add in the filler
-  let fIndex = lines.findIndex((line) => line.includes("|]"));
+  let noteLines = lines.filter((line) => line.includes("|"));
+  let measureCount = noteLines.map((line) => (line.match(/\|/g) || []).length).reduce((partialSum, a) => partialSum + a, 0) - 1;
+  let chordCount = chords.length;
 
-  lines[fIndex] = lines[fIndex].replace("|]", "| C |]");
-
-  console.log(lines.join("\n"))
+  // If we have more chords than measures (or equal number), add in fillers
+  if (chordCount > measureCount) {
+    const overflow = chordCount - measureCount; // How many measures we need to fill in
+    const overflowFiller = '|' + ' C |'.repeat(overflow);
+    let fIndex = lines.findLastIndex((line) => line.includes("|"));
+    let lastBarIndex = lines[fIndex].lastIndexOf('|');
+    if (lastBarIndex !== -1) {
+      lines[fIndex] = lines[fIndex].slice(0, lastBarIndex) + overflowFiller + lines[fIndex].slice(lastBarIndex + 1);
+    }
+  }
   return lines.join("\n");
 }
 
@@ -128,11 +163,65 @@ export const addVLines = (abc, vlines) => {
   return lines.join("\n");
 }
 
+export const extractTCLines = (abc) => {
+  // Split the lines into each line
+  let lines = abc.split("\n");
+
+  // Find indexes of all lines starting with V:
+  let tcIndexArr = lines.reduce(function(arr, line, idx) {
+    if (line.startsWith("T:") || line.startsWith("C:")) {
+      arr.push(idx);
+    }
+    return arr;
+  }, []);
+
+  // Extract all vLines
+  let tcLines = [];
+  tcIndexArr.forEach((idx) => {
+    tcLines.push(lines[idx]);
+    lines[idx] = "";
+  })
+
+  return [tcLines, lines.filter(line => line !== "").join("\n")];
+}
+
+export const addTCLines = (abc, tclines) => {
+  // Split the lines into each line
+  let lines = abc.split("\n");
+
+  // Find index of line where we should add in the T: / C: lines
+  let tcIndex = lines.findIndex((line) => line.includes("X:")) + 1;
+  tclines.forEach((tcline) => {
+    lines.splice(tcIndex, 0, tcline);
+    tcIndex++;
+  })
+
+  return lines.join("\n");
+}
+
+export const extractL = (abc) => {
+  // Split the lines into each line
+  let lines = abc.split("\n");
+
+  // Find index of line where we should add in the T: / C: lines
+  let LIndex = lines.findIndex((line) => line.includes("L:"));
+
+  // Find the default note length set
+  let defaultLength = lines[LIndex].slice(2);
+
+  if (defaultLength.includes('/')) {
+    let [numerator, denominator] = defaultLength.split('/').map(Number);
+    return numerator / denominator;
+  } else {
+      return parseInt(defaultLength, 10);
+  }
+}
+
 export const formatABCGeneration = (abc) => {
 
-  // Firstly, remove all lines that start with T: or C: or Q: or w:
+  // Firstly, remove all lines that start with T: or C: or Q: or V: or w:
   abc = abc.split("\n").filter((line) => {
-    return !line.startsWith("T:") && !line.startsWith("C:") && !line.startsWith("Q:") && !line.startsWith("w:");
+    return !line.startsWith("T:") && !line.startsWith("C:") && !line.startsWith("Q:") && !line.startsWith("V:") && !line.startsWith("w:");
   }).join("\n");
 
   // If last line is empty line, remove it
@@ -155,12 +244,13 @@ export const formatABCGeneration = (abc) => {
   // }
   // ).join("\n");
 
+  // Change all occurrences of !f! to |
+  abc = abc.replace(/!f!/g, '|');
+
   // Change all occurrences of |] to |
-  abc = abc.replace(/\|]/g, "|");
-
+  // abc = abc.replace(/\|]/g, "|");
   // Using regex, remove all occurrences of %{any_number}
-  abc = abc.replace(/%\d+/g, "");
-
+  // abc = abc.replace(/%\d+/g, "");
   // From the first |, remove all subsequent occurrences of \n
   // let firstBarIndex = abc.indexOf("|");
   // abc = abc.slice(0, firstBarIndex + 1) + abc.slice(firstBarIndex + 1).replace(/\n/g, "");
